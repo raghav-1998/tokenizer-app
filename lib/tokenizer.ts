@@ -23,5 +23,37 @@ function preTokenize(text:string): string[]{
     })
 }
 
+export function buildWordVocab(corpus:string[]):Vocab{
+    const tokenToId=new Map<string,number>();
 
-console.log(preTokenize("Hello, world! This is a test."));
+    let id=0
+    for (const special of Object.values(SPECIAL_TOKENS)){
+        tokenToId.set(special,id++);
+    }
+
+    for(const text of corpus){
+        const tokens=preTokenize(text);
+        for(const token of tokens){
+            if(!tokenToId.has(token)){
+                tokenToId.set(token,id++);
+            }
+        }
+    }
+
+    const idToToken = new Map<number, string>();
+    tokenToId.forEach((v, k) => idToToken.set(v, k));
+    return { tokenToId, idToToken };
+
+}
+
+// console.log(preTokenize("Hello, world! This is a test."));
+// console.log(preTokenize("Hello      world! This is a test."));
+
+const vocab = buildWordVocab([
+  "Hello world, this is Raghav's tokenizer.",
+  "This tokenizer supports word level tokenization.",
+]);
+console.log(vocab);
+console.log("vocab size:", vocab.tokenToId.size);
+console.log("id of 'Ġtokenizer':", vocab.tokenToId.get("Ġtokenizer"));
+console.log("token at id 0:", vocab.idToToken.get(0)); // should be <UNK>
