@@ -89,6 +89,29 @@ const vocab = buildWordVocab([
 ]);
 
 
+export function buildBPEVocab(corpus: string[]){
+    const wordFreq=new Map<string, number>();
+
+    for(const text of corpus){
+        const tokens=preTokenize(text);
+        for(const chunk of tokens){
+            wordFreq.set(chunk,(wordFreq.get(chunk)??0)+1)
+        }
+    }
+
+    const splits=new Map<string, string[]>();
+    for(const word of wordFreq.keys()){
+        if(word.startsWith(SPACE_MARKER)){
+            splits.set(word,[SPACE_MARKER,...word.slice(SPACE_MARKER.length).split("")])
+        }
+        else{
+            splits.set(word,word.split(""))
+        }
+    }
+
+    return {wordFreq, splits};
+}
+
 export class Tokenizer{
     constructor(private mode:TokenizerMode, private vocab:Vocab){}
     encode(text: string){
@@ -171,16 +194,23 @@ const charVocab = buildCharVocab([
 // console.log("is 'w' its own token?", charVocab.tokenToId.has("w"));
 // console.log("is 'Ġw' a token? (should be false)", charVocab.tokenToId.has("Ġw"));
 
-const charTokenizer = new Tokenizer("char", charVocab); // however you're constructing it
+// const charTokenizer = new Tokenizer("char", charVocab); // however you're constructing it
 
-const text = "Hello world, this is Raghav's tokenizer.";
-const { tokens, ids } = charTokenizer.encode(text);
-console.log("token count:", tokens.length);   // should be much bigger than word mode's 10
-// console.log("CharVocab", charVocab);
-// console.log("Tokens:", tokens);
-// console.log("Token IDs:", ids);
-console.log("decoded:", charTokenizer.decode(ids));
-console.log("exact match:", charTokenizer.decode(ids) === text);
+// const text = "Hello world, this is Raghav's tokenizer.";
+// const { tokens, ids } = charTokenizer.encode(text);
+// console.log("token count:", tokens.length);   // should be much bigger than word mode's 10
+// // console.log("CharVocab", charVocab);
+// // console.log("Tokens:", tokens);
+// // console.log("Token IDs:", ids);
+// console.log("decoded:", charTokenizer.decode(ids));
+// console.log("exact match:", charTokenizer.decode(ids) === text);
 
-const { ids: weirdIds } = charTokenizer.encode("Xyzzy?!");
-console.log("any UNK ids?", weirdIds.includes(0)); // 0 = <UNK> id
+// const { ids: weirdIds } = charTokenizer.encode("Xyzzy?!");
+// console.log("any UNK ids?", weirdIds.includes(0)); // 0 = <UNK> id
+
+const { wordFreq, splits } = buildBPEVocab([
+  "the cat sat",
+  "the cat ran",
+]);
+console.log("wordFreq:", [...wordFreq.entries()]);
+console.log("splits for 'Ġcat':", splits.get("Ġcat"));
