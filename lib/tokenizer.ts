@@ -112,6 +112,33 @@ export function buildBPEVocab(corpus: string[]){
     return {wordFreq, splits};
 }
 
+function countPairs(splits: Map<string, string[]>, wordFreq: Map<string, number>): Map<string, number> {
+    const pairCounts = new Map<string, number>();
+    for(const [word, symbols] of splits){
+        const freq=wordFreq.get(word)!;
+        for(let i=0;i<symbols.length-1;i++){
+            const pairKey=symbols[i]+"\u0000"+symbols[i+1];
+            pairCounts.set(pairKey, (pairCounts.get(pairKey)??0)+freq)
+        }
+    }
+    return pairCounts;
+}
+
+function findBestPair(pairCounts: Map<string, number>): [string, string] | null {
+    if(pairCounts.size===0)return null;
+    let bestPair="";
+    let bestCount=-1;
+
+    for(const [pair, count] of pairCounts){
+        if(count>bestCount){
+            bestCount=count;
+            bestPair=pair;
+        }
+    }
+    const [first, second] = bestPair.split("\u0000");
+    return [first, second];
+}
+
 export class Tokenizer{
     constructor(private mode:TokenizerMode, private vocab:Vocab){}
     encode(text: string){
@@ -186,9 +213,9 @@ export class Tokenizer{
 // console.log("id of 'Ġtokenizer':", vocab.tokenToId.get("Ġtokenizer"));
 // console.log("token at id 0:", vocab.idToToken.get(0)); // should be <UNK>
 
-const charVocab = buildCharVocab([
-  "Hello world, this is Raghav's tokenizer.",
-]);
+// const charVocab = buildCharVocab([
+//   "Hello world, this is Raghav's tokenizer.",
+// ]);
 // console.log("char vocab size:", charVocab.tokenToId.size);
 // console.log("is 'Ġ' its own token?", charVocab.tokenToId.has(SPACE_MARKER));
 // console.log("is 'w' its own token?", charVocab.tokenToId.has("w"));
@@ -212,5 +239,9 @@ const { wordFreq, splits } = buildBPEVocab([
   "the cat sat",
   "the cat ran",
 ]);
-console.log("wordFreq:", [...wordFreq.entries()]);
-console.log("splits for 'Ġcat':", splits.get("Ġcat"));
+// console.log("wordFreq:", [...wordFreq.entries()]);
+// console.log("splits for 'Ġcat':", splits.get("Ġcat"));
+
+const pairCounts = countPairs(splits, wordFreq);
+console.log("pair counts:", [...pairCounts.entries()]);
+console.log("best pair:", findBestPair(pairCounts));
