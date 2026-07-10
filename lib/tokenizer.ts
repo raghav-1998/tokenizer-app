@@ -273,6 +273,12 @@ export class Tokenizer{
                     tokens.push(...chunk.split(""));
                 }
             }
+        }else{
+            const{merges}=this.vocab as BPEVocab
+            const preTokenizedText=preTokenize(text);
+            for(const chunk of preTokenizedText){
+                tokens.push(...applyBPE(chunk, merges));
+            }
         }
         const ids=tokens.map((token)=>this.vocab.tokenToId.get(token)??unkId);
         return {tokens, ids};
