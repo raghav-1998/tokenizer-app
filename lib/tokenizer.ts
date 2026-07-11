@@ -94,7 +94,18 @@ export interface BPEVocab extends Vocab {
 //   protectedWords: Set<string>; // lowercase whole words that are NEVER split into subwords
 }
 
-export function buildInitialState(corpus: string[]){
+export const DEFAULT_PROTECTED_WORDS = [
+  "hi", "hello", "hey", "yes", "no", "ok", "okay", "thanks", "thank", "please",
+  "bye", "goodbye", "the", "is", "are", "am", "was", "were", "a", "an", "and",
+  "or", "but", "not", "this", "that", "i", "you", "he", "she", "it", "we", "they",
+];
+
+function isProtectedWord(word: string, protectedSet: Set<string>): boolean {
+  const bare = word.startsWith(SPACE_MARKER) ? word.slice(SPACE_MARKER.length) : word;
+  return protectedSet.has(bare.toLowerCase());
+}
+
+export function buildInitialState(corpus: string[], protectedSet:Set<string>){
     const wordFreq=new Map<string, number>();
 
     for(const text of corpus){
@@ -106,11 +117,20 @@ export function buildInitialState(corpus: string[]){
 
     const splits=new Map<string, string[]>();
     for(const word of wordFreq.keys()){
-        if(word.startsWith(SPACE_MARKER)){
+        // if(word.startsWith(SPACE_MARKER)){
+        //     splits.set(word,[SPACE_MARKER,...word.slice(SPACE_MARKER.length).split("")])
+        // }
+        // else{
+        //     splits.set(word,word.split(""))
+        // }
+        if(isProtectedWord(word, protectedSet)){
+            splits.set(word,[word]);
+        }
+        else if(word.startsWith(SPACE_MARKER)){
             splits.set(word,[SPACE_MARKER,...word.slice(SPACE_MARKER.length).split("")])
         }
         else{
-            splits.set(word,word.split(""))
+            splits.set(word,word.split(""));
         }
     }
 
@@ -222,7 +242,10 @@ export function buildBPEVocab(corpus:string[], numMerges:number=100):BPEVocab{
     return {...vocab, merges};
 }
 
-function applyBPE(word:string, merges:[string,string][]):string[]{
+function applyBPE(word:string, merges:[string,string][], protectedSet:Set<string>):string[]{
+    if(isProtectedWord(word, protectedSet)){
+        return [word];
+    }
     let symbols=word.startsWith(SPACE_MARKER)
          ?[SPACE_MARKER, ...word.slice(SPACE_MARKER.length).split("")]
          :word.split("");
@@ -345,10 +368,10 @@ export class Tokenizer{
 // const { ids: weirdIds } = charTokenizer.encode("Xyzzy?!");
 // console.log("any UNK ids?", weirdIds.includes(0)); // 0 = <UNK> id
 
-const bpeVocab=buildBPEVocab([
-  "the cat sat",
-  "the cat ran",
-]);
+// const bpeVocab=buildBPEVocab([
+//   "the cat sat",
+//   "the cat ran",
+// ]);
 // console.log("wordFreq:", [...wordFreq.entries()]);
 // console.log("splits for 'Ġcat':", splits.get("Ġcat"));
 
@@ -361,9 +384,35 @@ const bpeVocab=buildBPEVocab([
 // console.log("final splits:");
 // for (const [word, symbols] of splits) console.log(" ", word, "->", symbols);
 
-console.log("vocab size:", bpeVocab.tokenToId.size);
-console.log("id of standalone 't':", bpeVocab.tokenToId.get("t"));   // should NOT be undefined
-console.log("id of merged 'the':", bpeVocab.tokenToId.get("the"));
+// console.log("vocab size:", bpeVocab.tokenToId.size);
+// console.log("id of standalone 't':", bpeVocab.tokenToId.get("t"));   // should NOT be undefined
+// console.log("id of merged 'the':", bpeVocab.tokenToId.get("the"));
 
-console.log(applyBPE("sit", [["a","t"], ["t","h"], ["th","e"]]));   // word never seen in training at all
-console.log(applyBPE("Ġhat", [["a","t"], ["t","h"], ["th","e"]]));  // also never seen, but shares a learned pattern
+// console.log(applyBPE("sit", [["a","t"], ["t","h"], ["th","e"]]));   // word never seen in training at all
+// console.log(applyBPE("Ġhat", [["a","t"], ["t","h"], ["th","e"]]));  // also never seen, but shares a learned pattern
+
+const protectedSet = new Set(DEFAULT_PROTECTED_WORDS.map(w => w.toLowerCase()));
+
+// console.log(isProtectedWord("hi", protectedSet));        // expect true
+// console.log(isProtectedWord("Ġhello", protectedSet));     // expect true
+// console.log(isProtectedWord("Hi", protectedSet));         // expect true — capital H
+// console.log(isProtectedWord("Ġworld", protectedSet));     // expect false
+// console.log(isProtectedWord("tokenizer", protectedSet));  // expect false
+
+
+// const protectedSet = new Set(["hi"]);
+const { wordFreq, splits } = buildInitialState([
+  "Hi there, this is a tokenizer test.",
+  "This tokenizer test covers many common tokenizer words.",
+  "Testing tokenizer words repeatedly to dominate the merges.",
+], protectedSet);
+
+console.log("initial split for 'Hi':", splits.get("Hi"));  // expect ['Hi'] immediately
+
+learnMerges(splits, wordFreq, 15);
+
+console.log("final split for 'Hi':", splits.get("Hi"));    // expect STILL ['Hi'] — untouched
+
+const merges: [string, string][] = []; // pretend this came from training on totally different text
+console.log(applyBPE("hey", merges, new Set(["hey"])));  // expect ["hey"] — untouched, no merges needed
+console.log(applyBPE("Hey", merges, new Set(["hey"])));  // capital H — still protected?
