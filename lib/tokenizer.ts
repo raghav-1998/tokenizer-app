@@ -1,4 +1,4 @@
-export type TokenizerMode = "word" | "char"
+export type TokenizerMode = "word" | "char" | "bpe";
 
 export const SPACE_MARKER= "Ġ"; 
 
@@ -91,7 +91,7 @@ const vocab = buildWordVocab([
 
 export interface BPEVocab extends Vocab {
   merges: [string, string][]; // ordered list of merge rules, applied in this order at encode time
-//   protectedWords: Set<string>; // lowercase whole words that are NEVER split into subwords
+  protectedWords: Set<string>; // lowercase whole words that are NEVER split into subwords
 }
 
 export const DEFAULT_PROTECTED_WORDS = [
@@ -197,7 +197,7 @@ function learnMerges(splits: Map<string, string[]>, wordFreq: Map<string, number
   return merges;
 }
 
-function buildFinalVocab(splits: Map<string, string[]>, originalCorpusChunks:string[]): Vocab {
+function buildFinalVocab(splits: Map<string, string[]>, originalCorpusChunks:string[], protectedWords: string[]): Vocab {
     // console.log(splits);
     // console.log(originalCorpusChunks);
     const tokenToId = new Map<string, number>();
@@ -216,11 +216,24 @@ function buildFinalVocab(splits: Map<string, string[]>, originalCorpusChunks:str
         for (const ch of chars) if (!tokenToId.has(ch)) tokenToId.set(ch, id++);
     }
 
+    // Guarantee every protected word has a real vocab entry (both with and without
+  // a leading-space marker), even if it never appeared in the training corpus.
+  // This is what makes "hello", "hi" etc. reliably stay whole at encode time.
+
+    for (const w of protectedWords) {
+        const bare = w.toLowerCase();
+        for (const variant of [bare, SPACE_MARKER + bare]) {
+            if (!splits.has(variant)) splits.set(variant, [variant]);
+        }
+    }
+
     // 3. Merged symbols from the final converged splits.
     for (const symbols of splits.values()) {
         for (const s of symbols) if (!tokenToId.has(s)) tokenToId.set(s, id++);
     }
 
+
+    
     // 4. Reverse map.
     const idToToken = new Map<number, string>();
     tokenToId.forEach((v, k) => idToToken.set(v, k));
@@ -231,20 +244,25 @@ function buildFinalVocab(splits: Map<string, string[]>, originalCorpusChunks:str
     return { tokenToId, idToToken }
     
 }
-export function buildBPEVocab(corpus:string[], numMerges:number=100):BPEVocab{
-    const{wordFreq, splits}=buildInitialState(corpus);
+export function buildBPEVocab(corpus:string[], numMerges:number=100, protectedWords: string[] = DEFAULT_PROTECTED_WORDS):BPEVocab{
+    const protectedSet = new Set(protectedWords.map(w => w.toLowerCase()));
+
+    const{wordFreq, splits}=buildInitialState(corpus, protectedSet);
     // console.log("wordFreq:", [...wordFreq.entries()]);
     // console.log("initial splits:");
     // console.log(splits);
     const merges=learnMerges(splits, wordFreq, numMerges)
     // console.log("learned merges, in order:", merges);
-    const vocab=buildFinalVocab(splits, [...wordFreq.keys()]);
-    return {...vocab, merges};
+    const vocab=buildFinalVocab(splits, [...wordFreq.keys()], protectedWords);
+    return {...vocab, merges, protectedWords: protectedSet};
 }
 
 function applyBPE(word:string, merges:[string,string][], protectedSet:Set<string>):string[]{
     if(isProtectedWord(word, protectedSet)){
-        return [word];
+        // return [word];
+        const hasSpace = word.startsWith(SPACE_MARKER);
+        const bare = hasSpace ? word.slice(SPACE_MARKER.length) : word;
+        return [hasSpace ? SPACE_MARKER + bare.toLowerCase() : bare.toLowerCase()];
     }
     let symbols=word.startsWith(SPACE_MARKER)
          ?[SPACE_MARKER, ...word.slice(SPACE_MARKER.length).split("")]
@@ -297,10 +315,10 @@ export class Tokenizer{
                 }
             }
         }else{
-            const{merges}=this.vocab as BPEVocab
+            const{merges, protectedWords}=this.vocab as BPEVocab
             const preTokenizedText=preTokenize(text);
             for(const chunk of preTokenizedText){
-                tokens.push(...applyBPE(chunk, merges));
+                tokens.push(...applyBPE(chunk, merges, protectedWords));
             }
         }
         const ids=tokens.map((token)=>this.vocab.tokenToId.get(token)??unkId);
@@ -416,3 +434,15 @@ console.log("final split for 'Hi':", splits.get("Hi"));    // expect STILL ['Hi'
 const merges: [string, string][] = []; // pretend this came from training on totally different text
 console.log(applyBPE("hey", merges, new Set(["hey"])));  // expect ["hey"] — untouched, no merges needed
 console.log(applyBPE("Hey", merges, new Set(["hey"])));  // capital H — still protected?
+
+const bpeVocab = buildBPEVocab(
+  ["the cat sat", "the cat ran"],   // notice: no "hey" anywhere in here
+  15,
+  ["hey"]
+);
+
+console.log("id of 'hey':", bpeVocab.tokenToId.get("hey"));    // must be a real number
+console.log("id of 'Ġhey':", bpeVocab.tokenToId.get("Ġhey"));  // also a real number
+
+const bpeTokenizer = new Tokenizer("bpe", bpeVocab);
+console.log(bpeTokenizer.encode("Hey there"));   
