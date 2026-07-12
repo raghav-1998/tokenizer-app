@@ -1,3 +1,4 @@
+import { DEFAULT_CORPUS } from "./corpus";
 export type TokenizerMode = "word" | "char" | "bpe";
 
 export const SPACE_MARKER= "Ġ"; 
@@ -83,10 +84,10 @@ export function buildCharVocab(corpus:string[]):Vocab{
     return { tokenToId, idToToken };
 }
 
-const vocab = buildWordVocab([
-  "Hello world, this is Raghav's tokenizer.",
-  "This tokenizer supports word level tokenization.",
-]);
+// const vocab = buildWordVocab([
+//   "Hello world, this is Raghav's tokenizer.",
+//   "This tokenizer supports word level tokenization.",
+// ]);
 
 
 export interface BPEVocab extends Vocab {
@@ -197,7 +198,7 @@ function learnMerges(splits: Map<string, string[]>, wordFreq: Map<string, number
   return merges;
 }
 
-function buildFinalVocab(splits: Map<string, string[]>, originalCorpusChunks:string[], protectedWords: string[]): Vocab {
+function buildFinalVocab(splits: Map<string, string[]>, originalCorpusChunks:string[], protectedWords: string[], merges: [string, string][]): Vocab {
     // console.log(splits);
     // console.log(originalCorpusChunks);
     const tokenToId = new Map<string, number>();
@@ -227,12 +228,16 @@ function buildFinalVocab(splits: Map<string, string[]>, originalCorpusChunks:str
         }
     }
 
+    for (const [a, b] of merges) {
+    const merged = a + b;
+    if (!tokenToId.has(merged)) tokenToId.set(merged, id++);
+  }
+
+
     // 3. Merged symbols from the final converged splits.
     for (const symbols of splits.values()) {
         for (const s of symbols) if (!tokenToId.has(s)) tokenToId.set(s, id++);
     }
-
-
     
     // 4. Reverse map.
     const idToToken = new Map<number, string>();
@@ -253,7 +258,7 @@ export function buildBPEVocab(corpus:string[], numMerges:number=100, protectedWo
     // console.log(splits);
     const merges=learnMerges(splits, wordFreq, numMerges)
     // console.log("learned merges, in order:", merges);
-    const vocab=buildFinalVocab(splits, [...wordFreq.keys()], protectedWords);
+    const vocab=buildFinalVocab(splits, [...wordFreq.keys()], protectedWords, merges);
     return {...vocab, merges, protectedWords: protectedSet};
 }
 
@@ -352,6 +357,22 @@ export class Tokenizer{
     }
 }
 
+// ---------------------------------------------------------------------------
+// Factory: build a tokenizer for a chosen mode from a training corpus.
+// ---------------------------------------------------------------------------
+
+export function createTokenizer(mode:TokenizerMode, corpus:string[], options?:{numMerges?:number}):Tokenizer{
+    if(mode=="word"){
+        return new Tokenizer(mode, buildWordVocab(corpus));
+    }
+
+    if(mode=="char"){
+        return new Tokenizer(mode, buildCharVocab(corpus));
+    }
+
+    return new Tokenizer(mode, buildBPEVocab(corpus, options?.numMerges??200))
+}
+
 // const tokenizer=new Tokenizer();
 // const text = "Hello world, this is Raghav's tokenizer.";
 // const { tokens, ids } = tokenizer.encode(text);
@@ -409,7 +430,7 @@ export class Tokenizer{
 // console.log(applyBPE("sit", [["a","t"], ["t","h"], ["th","e"]]));   // word never seen in training at all
 // console.log(applyBPE("Ġhat", [["a","t"], ["t","h"], ["th","e"]]));  // also never seen, but shares a learned pattern
 
-const protectedSet = new Set(DEFAULT_PROTECTED_WORDS.map(w => w.toLowerCase()));
+// const protectedSet = new Set(DEFAULT_PROTECTED_WORDS.map(w => w.toLowerCase()));
 
 // console.log(isProtectedWord("hi", protectedSet));        // expect true
 // console.log(isProtectedWord("Ġhello", protectedSet));     // expect true
@@ -419,30 +440,47 @@ const protectedSet = new Set(DEFAULT_PROTECTED_WORDS.map(w => w.toLowerCase()));
 
 
 // const protectedSet = new Set(["hi"]);
-const { wordFreq, splits } = buildInitialState([
-  "Hi there, this is a tokenizer test.",
-  "This tokenizer test covers many common tokenizer words.",
-  "Testing tokenizer words repeatedly to dominate the merges.",
-], protectedSet);
+// const { wordFreq, splits } = buildInitialState([
+//   "Hi there, this is a tokenizer test.",
+//   "This tokenizer test covers many common tokenizer words.",
+//   "Testing tokenizer words repeatedly to dominate the merges.",
+// ], protectedSet);
 
-console.log("initial split for 'Hi':", splits.get("Hi"));  // expect ['Hi'] immediately
+// console.log("initial split for 'Hi':", splits.get("Hi"));  // expect ['Hi'] immediately
 
-learnMerges(splits, wordFreq, 15);
+// learnMerges(splits, wordFreq, 15);
 
-console.log("final split for 'Hi':", splits.get("Hi"));    // expect STILL ['Hi'] — untouched
+// console.log("final split for 'Hi':", splits.get("Hi"));    // expect STILL ['Hi'] — untouched
 
-const merges: [string, string][] = []; // pretend this came from training on totally different text
-console.log(applyBPE("hey", merges, new Set(["hey"])));  // expect ["hey"] — untouched, no merges needed
-console.log(applyBPE("Hey", merges, new Set(["hey"])));  // capital H — still protected?
+// const merges: [string, string][] = []; // pretend this came from training on totally different text
+// console.log(applyBPE("hey", merges, new Set(["hey"])));  // expect ["hey"] — untouched, no merges needed
+// console.log(applyBPE("Hey", merges, new Set(["hey"])));  // capital H — still protected?
 
-const bpeVocab = buildBPEVocab(
-  ["the cat sat", "the cat ran"],   // notice: no "hey" anywhere in here
-  15,
-  ["hey"]
-);
+// const bpeVocab = buildBPEVocab(
+//   ["the cat sat", "the cat ran"],   // notice: no "hey" anywhere in here
+//   15,
+//   ["hey"]
+// );
 
-console.log("id of 'hey':", bpeVocab.tokenToId.get("hey"));    // must be a real number
-console.log("id of 'Ġhey':", bpeVocab.tokenToId.get("Ġhey"));  // also a real number
+// console.log("id of 'hey':", bpeVocab.tokenToId.get("hey"));    // must be a real number
+// console.log("id of 'Ġhey':", bpeVocab.tokenToId.get("Ġhey"));  // also a real number
 
-const bpeTokenizer = new Tokenizer("bpe", bpeVocab);
-console.log(bpeTokenizer.encode("Hey there"));   
+// const bpeTokenizer = new Tokenizer("bpe", bpeVocab);
+// console.log(bpeTokenizer.encode("Hey there"));   
+
+// const corpus = ["the cat sat", "the cat ran"];
+
+// const wordTok = createTokenizer("word", corpus);
+// const charTok = createTokenizer("char", corpus);
+// const bpeTok = createTokenizer("bpe", corpus, { numMerges: 10 });
+
+// console.log("word:", wordTok.encode("the cat"));
+// console.log("char:", charTok.encode("the cat"));
+// console.log("bpe:", bpeTok.encode("the cat"));
+
+const bpeVocab = buildBPEVocab(DEFAULT_CORPUS, 300);
+const tokenizer = new Tokenizer("bpe", bpeVocab);
+const text = "Hi there, this tokenizer handles multilingual pretraining well.";
+const { ids } = tokenizer.encode(text);
+console.log("any UNK left?", ids.includes(0));
+console.log("decoded:", tokenizer.decode(ids));
