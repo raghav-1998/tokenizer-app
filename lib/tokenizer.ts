@@ -355,6 +355,11 @@ export class Tokenizer{
         //console.log("out:", out);
         return out;
     }
+
+    vocabSize(): number {
+        return this.vocab.tokenToId.size;
+    }
+
 }
 
 // ---------------------------------------------------------------------------
