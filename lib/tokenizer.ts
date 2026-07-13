@@ -360,6 +360,10 @@ export class Tokenizer{
         return this.vocab.tokenToId.size;
     }
 
+    getVocab():Vocab | BPEVocab{
+        return this.vocab;
+    }
+
 }
 
 // ---------------------------------------------------------------------------
