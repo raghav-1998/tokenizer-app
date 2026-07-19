@@ -101,6 +101,10 @@ export const DEFAULT_PROTECTED_WORDS = [
   "or", "but", "not", "this", "that", "i", "you", "he", "she", "it", "we", "they",
 ];
 
+export const BASE_ALPHABET =
+  "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789" +
+  " .,!?'\"-@#$%&*()[]{}:;/\\+=_<>~`^|";
+
 function isProtectedWord(word: string, protectedSet: Set<string>): boolean {
   const bare = word.startsWith(SPACE_MARKER) ? word.slice(SPACE_MARKER.length) : word;
   return protectedSet.has(bare.toLowerCase());
@@ -215,6 +219,10 @@ function buildFinalVocab(splits: Map<string, string[]>, originalCorpusChunks:str
         ? [SPACE_MARKER, ...chunk.slice(SPACE_MARKER.length).split("")]
         : chunk.split("");
         for (const ch of chars) if (!tokenToId.has(ch)) tokenToId.set(ch, id++);
+    }
+
+    for (const ch of BASE_ALPHABET) {
+        if (!tokenToId.has(ch)) tokenToId.set(ch, id++);
     }
 
     // Guarantee every protected word has a real vocab entry (both with and without
@@ -487,9 +495,19 @@ export function createTokenizer(mode:TokenizerMode, corpus:string[], options?:{n
 // console.log("char:", charTok.encode("the cat"));
 // console.log("bpe:", bpeTok.encode("the cat"));
 
-const bpeVocab = buildBPEVocab(DEFAULT_CORPUS, 300);
-const tokenizer = new Tokenizer("bpe", bpeVocab);
-const text = "Hi there, this tokenizer handles multilingual pretraining well.";
-const { ids } = tokenizer.encode(text);
-console.log("any UNK left?", ids.includes(0));
-console.log("decoded:", tokenizer.decode(ids));
+// const bpeVocab = buildBPEVocab(DEFAULT_CORPUS, 300);
+// const tokenizer = new Tokenizer("bpe", bpeVocab);
+// const text = "Hi there, this tokenizer handles multilingual pretraining well.";
+// const { ids } = tokenizer.encode(text);
+// console.log("any UNK left?", ids.includes(0));
+// console.log("decoded:", tokenizer.decode(ids));
+
+const tokenizer = createTokenizer("bpe", DEFAULT_CORPUS, { numMerges: 300 });
+const vocab = tokenizer.getVocab();
+
+console.log("id of bare 'hi':", vocab.tokenToId.get("hi"));
+console.log("id of marked 'Ġhi':", vocab.tokenToId.get("Ġhi"));
+console.log("id of bare 'hello':", vocab.tokenToId.get("hello"));
+
+const { tokens, ids } = tokenizer.encode("Hi hello");
+console.log("encode result:", tokens, ids);
