@@ -1,26 +1,27 @@
+@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap");
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+@theme {
+  --color-bg: #0A0E17;
+  --color-panel: #121826;
+  --color-panel-alt: #161D2E;
+  --color-border: #232B3D;
+  --color-text: #E7ECF3;
+  --color-muted: #7C8AA0;
+  --color-mint: #5EEAD4;
+  --color-amber: #F2B84B;
+  --color-danger: #F87171;
+
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+  --font-sans: Inter, ui-sans-serif, system-ui, sans-serif;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  color-scheme: dark;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: #0A0E17;
+  color: #E7ECF3;
+  font-family: var(--font-sans);
 }

@@ -487,9 +487,19 @@ export function createTokenizer(mode:TokenizerMode, corpus:string[], options?:{n
 // console.log("char:", charTok.encode("the cat"));
 // console.log("bpe:", bpeTok.encode("the cat"));
 
-const bpeVocab = buildBPEVocab(DEFAULT_CORPUS, 300);
-const tokenizer = new Tokenizer("bpe", bpeVocab);
-const text = "Hi there, this tokenizer handles multilingual pretraining well.";
-const { ids } = tokenizer.encode(text);
-console.log("any UNK left?", ids.includes(0));
-console.log("decoded:", tokenizer.decode(ids));
+// const bpeVocab = buildBPEVocab(DEFAULT_CORPUS, 300);
+// const tokenizer = new Tokenizer("bpe", bpeVocab);
+// const text = "Hi there, this tokenizer handles multilingual pretraining well.";
+// const { ids } = tokenizer.encode(text);
+// console.log("any UNK left?", ids.includes(0));
+// console.log("decoded:", tokenizer.decode(ids));
+
+const tokenizer = createTokenizer("bpe", DEFAULT_CORPUS, { numMerges: 300 });
+const vocab = tokenizer.getVocab();
+
+console.log("id of bare 'hi':", vocab.tokenToId.get("hi"));
+console.log("id of marked 'Ġhi':", vocab.tokenToId.get("Ġhi"));
+console.log("id of bare 'hello':", vocab.tokenToId.get("hello"));
+
+const { tokens, ids } = tokenizer.encode("Hi hello");
+console.log("encode result:", tokens, ids);
