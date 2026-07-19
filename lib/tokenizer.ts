@@ -101,6 +101,10 @@ export const DEFAULT_PROTECTED_WORDS = [
   "or", "but", "not", "this", "that", "i", "you", "he", "she", "it", "we", "they",
 ];
 
+export const BASE_ALPHABET =
+  "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789" +
+  " .,!?'\"-@#$%&*()[]{}:;/\\+=_<>~`^|";
+
 function isProtectedWord(word: string, protectedSet: Set<string>): boolean {
   const bare = word.startsWith(SPACE_MARKER) ? word.slice(SPACE_MARKER.length) : word;
   return protectedSet.has(bare.toLowerCase());
@@ -215,6 +219,10 @@ function buildFinalVocab(splits: Map<string, string[]>, originalCorpusChunks:str
         ? [SPACE_MARKER, ...chunk.slice(SPACE_MARKER.length).split("")]
         : chunk.split("");
         for (const ch of chars) if (!tokenToId.has(ch)) tokenToId.set(ch, id++);
+    }
+
+    for (const ch of BASE_ALPHABET) {
+        if (!tokenToId.has(ch)) tokenToId.set(ch, id++);
     }
 
     // Guarantee every protected word has a real vocab entry (both with and without
